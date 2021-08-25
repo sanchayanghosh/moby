@@ -1,3 +1,4 @@
+//go:build linux || freebsd
 // +build linux freebsd
 
 package daemon // import "github.com/docker/docker/daemon"
@@ -866,6 +867,7 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 
 	if len(activeSandboxes) > 0 {
 		logrus.Info("There are old running containers, the network config will not take affect")
+		setHostGatewayIP(daemon, controller)
 		return controller, nil
 	}
 
@@ -903,6 +905,14 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 	}
 
 	// Set HostGatewayIP to the default bridge's IP  if it is empty
+	setHostGatewayIP(daemon, controller)
+
+	return controller, nil
+}
+
+/* This is a function that runs a block of code initially inside of initNetworkController
+This is a potential fix to an issue #42753 relating to containers not receiving host bridge addresses */
+func setHostGatewayIP(daemon *Daemon, controller libnetwork.NetworkController) {
 	if daemon.configStore.HostGatewayIP == nil && controller != nil {
 		if n, err := controller.NetworkByName("bridge"); err == nil {
 			v4Info, v6Info := n.Info().IpamInfo()
@@ -915,7 +925,6 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 			daemon.configStore.HostGatewayIP = gateway
 		}
 	}
-	return controller, nil
 }
 
 func driverOptions(config *config.Config) []nwconfig.Option {

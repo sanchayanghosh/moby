@@ -867,7 +867,7 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 
 	if len(activeSandboxes) > 0 {
 		logrus.Info("There are old running containers, the network config will not take affect")
-		setHostGatewayIP(daemon, controller)
+		setHostGatewayIP(daemon.configStore, controller)
 		return controller, nil
 	}
 
@@ -905,25 +905,25 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 	}
 
 	// Set HostGatewayIP to the default bridge's IP  if it is empty
-	setHostGatewayIP(daemon, controller)
+	setHostGatewayIP(daemon.configStore, controller)
 
 	return controller, nil
 }
 
-/* This is a function that runs a block of code initially inside of initNetworkController
-This is a potential fix to an issue #42753 relating to containers not receiving host bridge addresses */
-func setHostGatewayIP(daemon *Daemon, controller libnetwork.NetworkController) {
-	if daemon.configStore.HostGatewayIP == nil && controller != nil {
-		if n, err := controller.NetworkByName("bridge"); err == nil {
-			v4Info, v6Info := n.Info().IpamInfo()
-			var gateway net.IP
-			if len(v4Info) > 0 {
-				gateway = v4Info[0].Gateway.IP
-			} else if len(v6Info) > 0 {
-				gateway = v6Info[0].Gateway.IP
-			}
-			daemon.configStore.HostGatewayIP = gateway
+// setHostGatewayIP sets cfg.HostGatewayIP to the default bridge's IP  if it is empty
+func setHostGatewayIP(config *config.Config, controller libnetwork.NetworkController) {
+	if config.HostGatewayIP != nil {
+		return
+	}
+	if n, err := controller.NetworkByName("bridge"); err == nil {
+		v4Info, v6Info := n.Info().IpamInfo()
+		var gateway net.IP
+		if len(v4Info) > 0 {
+			gateway = v4Info[0].Gateway.IP
+		} else if len(v6Info) > 0 {
+			gateway = v6Info[0].Gateway.IP
 		}
+		config.HostGatewayIP = gateway
 	}
 }
 
